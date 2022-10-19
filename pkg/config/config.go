@@ -48,6 +48,11 @@ type ClusterConfig struct {
 	MTU                  string `json:"mtu"`
 }
 
+type IngressConfig struct {
+	ServingCertificate []byte
+	ServingKey         []byte
+}
+
 type DebugConfig struct {
 	Pprof bool `json:"pprof"`
 }
@@ -65,6 +70,8 @@ type MicroshiftConfig struct {
 	NodeIP   string `json:"nodeIP"`
 
 	Cluster ClusterConfig `json:"cluster"`
+
+	Ingress IngressConfig `json:"ingress"`
 
 	Manifests []string `json:"manifests"`
 

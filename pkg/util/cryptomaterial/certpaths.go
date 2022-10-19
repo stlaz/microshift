@@ -103,6 +103,10 @@ func RouteControllerManagerServingCertDir(certsDir string) string {
 	return filepath.Join(ServiceCADir(certsDir), "route-controller-manager-serving")
 }
 
+func IngressCADir(certsDir string) string {
+	return filepath.Join(certsDir, "ingress-ca")
+}
+
 func AggregatorSignerDir(certsDir string) string {
 	return filepath.Join(certsDir, "aggregator-signer")
 }
