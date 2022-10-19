@@ -48,6 +48,7 @@
 // assets/components/openshift-router/service-account.yaml
 // assets/components/openshift-router/service-cloud.yaml
 // assets/components/openshift-router/service-internal.yaml
+// assets/components/openshift-router/serving-certificate.yaml
 // assets/components/ovn/clusterrole.yaml
 // assets/components/ovn/clusterrolebinding.yaml
 // assets/components/ovn/configmap.yaml
@@ -2776,7 +2777,7 @@ metadata:
   name: router-internal-default
   namespace: openshift-ingress
   annotations:
-    service.alpha.openshift.io/serving-cert-secret-name: router-certs-default
+    service.alpha.openshift.io/serving-cert-secret-name: router-metrics-certs-default
 `)
 
 func assetsComponentsOpenshiftRouterServiceInternalYamlBytes() ([]byte, error) {
@@ -2789,7 +2790,28 @@ func assetsComponentsOpenshiftRouterServiceInternalYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/components/openshift-router/service-internal.yaml", size: 747, mode: os.FileMode(420), modTime: time.Unix(1664090284, 0)}
+	info := bindataFileInfo{name: "assets/components/openshift-router/service-internal.yaml", size: 755, mode: os.FileMode(420), modTime: time.Unix(1664090284, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _assetsComponentsOpenshiftRouterServingCertificateYaml = []byte(`apiVersion: v1
+kind: Secret
+metadata:
+  namespace: openshift-ingress
+  name: router-certs-default`)
+
+func assetsComponentsOpenshiftRouterServingCertificateYamlBytes() ([]byte, error) {
+	return _assetsComponentsOpenshiftRouterServingCertificateYaml, nil
+}
+
+func assetsComponentsOpenshiftRouterServingCertificateYaml() (*asset, error) {
+	bytes, err := assetsComponentsOpenshiftRouterServingCertificateYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "assets/components/openshift-router/serving-certificate.yaml", size: 97, mode: os.FileMode(420), modTime: time.Unix(1664090284, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6645,6 +6667,7 @@ var _bindata = map[string]func() (*asset, error){
 	"assets/components/openshift-router/service-account.yaml":                                                assetsComponentsOpenshiftRouterServiceAccountYaml,
 	"assets/components/openshift-router/service-cloud.yaml":                                                  assetsComponentsOpenshiftRouterServiceCloudYaml,
 	"assets/components/openshift-router/service-internal.yaml":                                               assetsComponentsOpenshiftRouterServiceInternalYaml,
+	"assets/components/openshift-router/serving-certificate.yaml":                                            assetsComponentsOpenshiftRouterServingCertificateYaml,
 	"assets/components/ovn/clusterrole.yaml":                                                                 assetsComponentsOvnClusterroleYaml,
 	"assets/components/ovn/clusterrolebinding.yaml":                                                          assetsComponentsOvnClusterrolebindingYaml,
 	"assets/components/ovn/configmap.yaml":                                                                   assetsComponentsOvnConfigmapYaml,
@@ -6706,11 +6729,13 @@ var _bindata = map[string]func() (*asset, error){
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"}
 // AssetDir("data/img") would return []string{"a.png", "b.png"}
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error
@@ -6804,6 +6829,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				"service-account.yaml":                                {assetsComponentsOpenshiftRouterServiceAccountYaml, map[string]*bintree{}},
 				"service-cloud.yaml":                                  {assetsComponentsOpenshiftRouterServiceCloudYaml, map[string]*bintree{}},
 				"service-internal.yaml":                               {assetsComponentsOpenshiftRouterServiceInternalYaml, map[string]*bintree{}},
+				"serving-certificate.yaml":                            {assetsComponentsOpenshiftRouterServingCertificateYaml, map[string]*bintree{}},
 			}},
 			"ovn": {nil, map[string]*bintree{
 				"clusterrole.yaml":        {assetsComponentsOvnClusterroleYaml, map[string]*bintree{}},
