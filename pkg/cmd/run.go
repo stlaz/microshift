@@ -18,7 +18,7 @@ import (
 	"github.com/openshift/microshift/pkg/servicemanager"
 	"github.com/openshift/microshift/pkg/sysconfwatch"
 	"github.com/openshift/microshift/pkg/util"
-	"github.com/openshift/microshift/pkg/util/cryptomaterial"
+	"github.com/openshift/microshift/pkg/util/cryptomaterial/certchains"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -135,7 +135,7 @@ func RunMicroshift(cfg *config.MicroshiftConfig, flags *pflag.FlagSet) error {
 
 	klog.Infof("Starting MicroShift")
 
-	_, rotationDate, err := cryptomaterial.WhenToRotateAtEarliest(certChains)
+	_, rotationDate, err := certchains.WhenToRotateAtEarliest(certChains)
 	if err != nil {
 		klog.Fatalf("failed to determine when to rotate certificates: %v", err)
 	}

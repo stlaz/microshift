@@ -1,4 +1,4 @@
-package cryptomaterial
+package certchains
 
 import (
 	"crypto/x509"
@@ -14,6 +14,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/microshift/pkg/util/cryptomaterial"
 )
 
 type certificateChains struct {
@@ -76,7 +77,7 @@ func (cs *certificateChains) Complete() (*CertificateChains, error) {
 	}
 
 	for bundlePath, pemChain := range bundlePreWrite {
-		if err := appendCertsToFile(bundlePath, pemChain); err != nil {
+		if err := cryptomaterial.AppendCertsToFile(bundlePath, pemChain); err != nil {
 			return nil, err
 		}
 	}
@@ -255,9 +256,9 @@ func (s *certificateSigner) Complete() (*CertificateSigner, error) {
 	if signerConfig == nil {
 		var err error
 		signerConfig, _, err = crypto.EnsureCA(
-			CACertPath(s.signerDir),
-			CAKeyPath(s.signerDir),
-			CASerialsPath(s.signerDir),
+			cryptomaterial.CACertPath(s.signerDir),
+			cryptomaterial.CAKeyPath(s.signerDir),
+			cryptomaterial.CASerialsPath(s.signerDir),
 			s.signerName,
 			s.signerValidityDays,
 		)
@@ -315,9 +316,9 @@ func (s *CertificateSigner) GetSignerCertPEM() ([]byte, error) {
 func (s *CertificateSigner) SignSubCA(signerInfo *certificateSigner) error {
 	subCA, _, err := libraryGoEnsureSubCA(
 		s.signerConfig,
-		CABundlePath(signerInfo.signerDir),
-		CAKeyPath(signerInfo.signerDir),
-		CASerialsPath(signerInfo.signerDir),
+		cryptomaterial.CABundlePath(signerInfo.signerDir),
+		cryptomaterial.CAKeyPath(signerInfo.signerDir),
+		cryptomaterial.CASerialsPath(signerInfo.signerDir),
 		signerInfo.signerName,
 		signerInfo.signerValidityDays,
 	)
@@ -327,7 +328,7 @@ func (s *CertificateSigner) SignSubCA(signerInfo *certificateSigner) error {
 
 	// the library code above writes the whole cert chain in files but some of
 	// the kube code requires a single cert per signer cert file
-	subCACertPath := CACertPath(signerInfo.signerDir)
+	subCACertPath := cryptomaterial.CACertPath(signerInfo.signerDir)
 	if _, err := os.Stat(subCACertPath); err == nil || os.IsNotExist(err) {
 		certPEM, err := crypto.EncodeCertificates(subCA.Config.Certs[0])
 		if err != nil {
@@ -353,8 +354,8 @@ func (s *CertificateSigner) SignClientCertificate(signInfo *ClientCertificateSig
 	certDir := filepath.Join(s.signerDir, signInfo.Name)
 
 	tlsConfig, _, err := s.signerConfig.EnsureClientCertificate(
-		ClientCertPath(certDir),
-		ClientKeyPath(certDir),
+		cryptomaterial.ClientCertPath(certDir),
+		cryptomaterial.ClientKeyPath(certDir),
 		signInfo.UserInfo,
 		signInfo.ValidityDays,
 	)
@@ -374,8 +375,8 @@ func (s *CertificateSigner) SignServingCertificate(signInfo *ServingCertificateS
 	certDir := filepath.Join(s.signerDir, signInfo.Name)
 
 	tlsConfig, _, err := s.signerConfig.EnsureServerCert(
-		ServingCertPath(certDir),
-		ServingKeyPath(certDir),
+		cryptomaterial.ServingCertPath(certDir),
+		cryptomaterial.ServingKeyPath(certDir),
 		sets.NewString(signInfo.Hostnames...),
 		signInfo.ValidityDays,
 	)
@@ -396,8 +397,8 @@ func (s *CertificateSigner) SignPeerCertificate(signInfo *PeerCertificateSigning
 
 	hostnameSet := sets.NewString(signInfo.Hostnames...)
 	if _, err := crypto.GetServerCert(
-		PeerCertPath(certDir),
-		PeerKeyPath(certDir),
+		cryptomaterial.PeerCertPath(certDir),
+		cryptomaterial.PeerKeyPath(certDir),
 		hostnameSet,
 	); err == nil {
 		return nil
@@ -418,8 +419,8 @@ func (s *CertificateSigner) SignPeerCertificate(signInfo *PeerCertificateSigning
 	}
 
 	if err := tlsConfig.WriteCertConfigFile(
-		PeerCertPath(certDir),
-		PeerKeyPath(certDir),
+		cryptomaterial.PeerCertPath(certDir),
+		cryptomaterial.PeerKeyPath(certDir),
 	); err != nil {
 		return fmt.Errorf("failed to write peer certificate for %q: %w", signInfo.Name, err)
 	}

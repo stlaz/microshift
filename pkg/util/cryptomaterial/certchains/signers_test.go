@@ -1,4 +1,4 @@
-package cryptomaterial
+package certchains
 
 import (
 	"crypto/x509"
