@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/microshift/pkg/servicemanager"
 	"github.com/openshift/microshift/pkg/sysconfwatch"
 	"github.com/openshift/microshift/pkg/util"
+	"github.com/openshift/microshift/pkg/util/cryptomaterial"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -94,8 +95,14 @@ func RunMicroshift(cfg *config.MicroshiftConfig, flags *pflag.FlagSet) error {
 	os.MkdirAll(cfg.AuditLogDir, 0700)
 
 	// TODO: change to only initialize what is strictly necessary for the selected role(s)
-	if err := initAll(cfg); err != nil {
+	certChains, err := initCerts(cfg)
+	if err != nil {
 		klog.Fatalf("failed to retrieve the necessary certificates: %v", err)
+	}
+
+	// create kubeconfig for kube-scheduler, kubelet,controller-manager
+	if err := initKubeconfigs(cfg, certChains); err != nil {
+		klog.Fatalf("failed to create the necessary kubeconfigs for internal components: %v", err)
 	}
 
 	m := servicemanager.NewServiceManager()
@@ -128,7 +135,12 @@ func RunMicroshift(cfg *config.MicroshiftConfig, flags *pflag.FlagSet) error {
 
 	klog.Infof("Starting MicroShift")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, rotationDate, err := cryptomaterial.WhenToRotateAtEarliest(certChains)
+	if err != nil {
+		klog.Fatalf("failed to determine when to rotate certificates: %v", err)
+	}
+
+	ctx, cancel := context.WithDeadline(context.Background(), rotationDate)
 	ready, stopped := make(chan struct{}), make(chan struct{})
 	go func() {
 		klog.Infof("Started %s", m.Name())
@@ -149,8 +161,7 @@ func RunMicroshift(cfg *config.MicroshiftConfig, flags *pflag.FlagSet) error {
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 		go func() {
-			var server *http.Server
-			server = &http.Server{
+			server := &http.Server{
 				Addr:    cfg.NodeIP + ":29500",
 				Handler: mux,
 			}

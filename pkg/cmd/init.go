@@ -16,10 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	ctrl "k8s.io/kubernetes/pkg/controlplane"
@@ -29,21 +31,45 @@ import (
 	"github.com/openshift/microshift/pkg/util/cryptomaterial"
 )
 
-func initAll(cfg *config.MicroshiftConfig) error {
-	// create CA and keys
-	certChains, err := initCerts(cfg)
+func initCerts(cfg *config.MicroshiftConfig) (*cryptomaterial.CertificateChains, error) {
+	certChains, err := certSetup(cfg)
 	if err != nil {
-		return err
-	}
-	// create kubeconfig for kube-scheduler, kubelet,controller-manager
-	if err := initKubeconfig(cfg, certChains); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	// we cannot just remove the certs dir and regenerate all the certificates
+	// because there are some long-lived certs and CAs that shouldn't be swapped
+	// - for example system:admin client certs, KAS serving CAs
+	const startupLifetimeThreshhold = 0.5 // FIXME: this would mean regen after 5 years of a 10 years-lived CAs
+	regenCerts := [][]string{}
+	err = certChains.WalkChains(nil, func(certPath []string, c x509.Certificate) error {
+		if now := time.Now(); now.Before(c.NotBefore) || now.After(c.NotAfter) {
+			regenCerts = append(regenCerts, certPath)
+		}
+
+		totalTime := c.NotAfter.Sub(c.NotBefore).Seconds()
+		timeElapsed := time.Now().Sub(c.NotBefore).Seconds()
+
+		if totalTime/timeElapsed > startupLifetimeThreshhold {
+			regenCerts = append(regenCerts, certPath)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range regenCerts {
+		if err := certChains.Regenerate(c); err != nil {
+			return err
+		}
+	}
+
+	return certChains, err
 }
 
-func initCerts(cfg *config.MicroshiftConfig) (*cryptomaterial.CertificateChains, error) {
+func certSetup(cfg *config.MicroshiftConfig) (*cryptomaterial.CertificateChains, error) {
 	_, svcNet, err := net.ParseCIDR(cfg.Cluster.ServiceCIDR)
 	if err != nil {
 		return nil, err
@@ -332,7 +358,7 @@ func initCerts(cfg *config.MicroshiftConfig) (*cryptomaterial.CertificateChains,
 	return certChains, nil
 }
 
-func initKubeconfig(
+func initKubeconfigs(
 	cfg *config.MicroshiftConfig,
 	certChains *cryptomaterial.CertificateChains,
 ) error {
