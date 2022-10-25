@@ -22,6 +22,7 @@ type CertificateSignerBuilder interface {
 	WithClientCertificates(signInfos ...*ClientCertificateSigningRequestInfo) CertificateSignerBuilder
 	WithServingCertificates(signInfos ...*ServingCertificateSigningRequestInfo) CertificateSignerBuilder
 	WithPeerCertificiates(signInfos ...*PeerCertificateSigningRequestInfo) CertificateSignerBuilder
+	WithCABundlePaths(bundlePath ...string) CertificateSignerBuilder
 	Complete() (*CertificateSigner, error)
 }
 
@@ -35,6 +36,9 @@ type certificateSigner struct {
 	signerConfig       *crypto.CA
 	subCAs             []CertificateSignerBuilder
 	certificatesToSign []CSRInfo
+
+	// locations of bundles where this signer appears
+	caBundlePaths []string
 }
 
 // NewCertificateSigner returns a builder object for a certificate chain for the given signer
@@ -55,6 +59,11 @@ func (s *certificateSigner) ValidityDays() int { return s.signerValidityDays }
 // This is useful when creating intermediate signers.
 func (s *certificateSigner) WithSignerConfig(config *crypto.CA) CertificateSignerBuilder {
 	s.signerConfig = config
+	return s
+}
+
+func (s *certificateSigner) WithCABundlePaths(bundlePaths ...string) CertificateSignerBuilder {
+	s.caBundlePaths = append(s.caBundlePaths, bundlePaths...)
 	return s
 }
 
@@ -124,6 +133,10 @@ func (s *certificateSigner) Complete() (*CertificateSigner, error) {
 		if err := signerCompleted.SignCertificate(si); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := signerCompleted.AddToBundles(s.caBundlePaths...); err != nil {
+		return nil, err
 	}
 
 	return signerCompleted, nil

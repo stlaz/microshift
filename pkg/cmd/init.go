@@ -49,7 +49,7 @@ func initCerts(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 		}
 
 		totalTime := c.NotAfter.Sub(c.NotBefore).Seconds()
-		timeElapsed := time.Now().Sub(c.NotBefore).Seconds()
+		timeElapsed := time.Since(c.NotBefore).Seconds()
 
 		if totalTime/timeElapsed > startupLifetimeThreshhold {
 			regenCerts = append(regenCerts, certPath)
@@ -310,39 +310,26 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 		),
 	).WithCABundle(
 		cryptomaterial.TotalClientCABundlePath(certsDir),
-		"kube-control-plane-signer",
-		"kube-apiserver-to-kubelet-signer",
-		"admin-kubeconfig-signer",
-		"kubelet-signer",
-		// kube-csr-signer is being added below
+		[]string{"kube-control-plane-signer"},
+		[]string{"kube-apiserver-to-kubelet-signer"},
+		[]string{"admin-kubeconfig-signer"},
+		[]string{"kubelet-signer"},
+		[]string{"kubelet-signer", "kube-csr-signer"},
 	).WithCABundle(
 		cryptomaterial.KubeletClientCAPath(certsDir),
-		"kube-control-plane-signer",
-		"kube-apiserver-to-kubelet-signer",
-		"admin-kubeconfig-signer",
-		"kubelet-signer",
-		// kube-csr-signer is being added below
+		[]string{"kube-control-plane-signer"},
+		[]string{"kube-apiserver-to-kubelet-signer"},
+		[]string{"admin-kubeconfig-signer"},
+		[]string{"kubelet-signer"},
+		[]string{"kubelet-signer", "kube-csr-signer"},
 	).WithCABundle(
 		cryptomaterial.ServiceAccountTokenCABundlePath(certsDir),
-		"kube-apiserver-external-signer",
-		"kube-apiserver-localhost-signer",
-		"kube-apiserver-service-network-signer",
+		[]string{"kube-apiserver-external-signer"},
+		[]string{"kube-apiserver-localhost-signer"},
+		[]string{"kube-apiserver-service-network-signer"},
 	).Complete()
 
 	if err != nil {
-		return nil, err
-	}
-
-	csrSignerCAPEM, err := certChains.GetSigner("kubelet-signer", "kube-csr-signer").GetSignerCertPEM()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := cryptomaterial.AddToKubeletClientCABundle(certsDir, csrSignerCAPEM); err != nil {
-		return nil, err
-	}
-
-	if err := cryptomaterial.AddToTotalClientCABundle(certsDir, csrSignerCAPEM); err != nil {
 		return nil, err
 	}
 

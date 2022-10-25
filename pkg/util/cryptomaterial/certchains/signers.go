@@ -61,6 +61,8 @@ type CertificateSigner struct {
 
 	subCAs             map[string]*CertificateSigner
 	signedCertificates map[string]*signedCertificateInfo
+
+	caBundlePaths []string
 }
 
 type signedCertificateInfo struct {
@@ -127,10 +129,9 @@ func (s *CertificateSigner) regenerateSelf() error {
 		return fmt.Errorf("failed to regenerate %s CA certificate: %w", s.signerName, err)
 	}
 
-	// TODO: rewrite itself in the bundles, too
 	s.signerConfig = signerConfig
 
-	return nil
+	return s.AddToBundles(s.caBundlePaths...)
 }
 
 func (s *CertificateSigner) regenerateSubCA(subCAName string) error {
@@ -168,6 +169,55 @@ func (s *CertificateSigner) regenerateCertificate(certName string) error {
 	return nil
 }
 
+func (s *CertificateSigner) AddToBundles(bundlePaths ...string) error {
+	cert := s.signerConfig.Config.Certs[0]
+
+	for _, bundlePath := range bundlePaths {
+		bundlePEMs, err := os.ReadFile(bundlePath)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		certs, err := crypto.CertsFromPEM(bundlePEMs)
+		if err != nil {
+			return err
+		}
+
+		var certsChanged bool
+		for i, c := range certs {
+			if c.Subject.String() == cert.Subject.String() &&
+				c.Issuer.String() == cert.Issuer.String() {
+				if c.SerialNumber != cert.SerialNumber {
+					certs[i] = c
+					certsChanged = true
+				}
+				break
+			}
+		}
+
+		if !certsChanged {
+			continue
+		}
+
+		certFileWriter, err := os.OpenFile(bundlePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+
+		bytes, err := crypto.EncodeCertificates(certs...)
+		if err != nil {
+			return err
+		}
+		if _, err := certFileWriter.Write(bytes); err != nil {
+			return err
+		}
+
+		s.caBundlePaths = append(s.caBundlePaths, bundlePath)
+	}
+
+	return nil
+}
+
 func (s *CertificateSigner) toBuilder() CertificateSignerBuilder {
 	signer := NewCertificateSigner(s.signerName, s.signerDir, s.signerValidityDays)
 
@@ -187,6 +237,8 @@ func (s *CertificateSigner) toBuilder() CertificateSignerBuilder {
 			panic("failed to handle type %T as a CSRInfo")
 		}
 	}
+
+	signer = signer.WithCABundlePaths(s.caBundlePaths...)
 
 	return signer
 }
@@ -234,7 +286,9 @@ func (s *CertificateSigner) SignSubCA(subSignerInfo CertificateSignerBuilder) er
 		}
 	}
 
-	subCertSigner, err := subSignerInfo.WithSignerConfig(subCA).Complete()
+	subCertSigner, err := subSignerInfo.
+		WithSignerConfig(subCA).
+		Complete()
 	if err != nil {
 		return err
 	}
