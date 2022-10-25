@@ -62,8 +62,8 @@ func initCerts(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 	}
 
 	for _, c := range regenCerts {
-		if err := certChains.Regenerate(c); err != nil {
-			return err
+		if err := certChains.Regenerate(c...); err != nil {
+			return nil, err
 		}
 	}
 
@@ -95,14 +95,14 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			cryptomaterial.KubeControlPlaneSignerCAValidityDays,
 		).WithClientCertificates(
 			&certchains.ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "kube-controller-manager",
 					ValidityDays: cryptomaterial.ClientCertValidityDays,
 				},
 				UserInfo: &user.DefaultInfo{Name: "system:kube-controller-manager"},
 			},
 			&certchains.ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "kube-scheduler",
 					ValidityDays: cryptomaterial.ClientCertValidityDays,
 				},
@@ -116,7 +116,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			cryptomaterial.KubeAPIServerToKubeletCAValidityDays,
 		).WithClientCertificates(
 			&certchains.ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "kube-apiserver-to-kubelet-client",
 					ValidityDays: cryptomaterial.ClientCertValidityDays,
 				},
@@ -130,7 +130,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			cryptomaterial.AdminKubeconfigCAValidityDays,
 		).WithClientCertificates(
 			&certchains.ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "admin-kubeconfig-client",
 					ValidityDays: cryptomaterial.AdminKubeconfigClientCertValidityDays,
 				},
@@ -149,7 +149,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 				cryptomaterial.KubeControllerManagerCSRSignerCAValidityDays,
 			).WithClientCertificates(
 				&certchains.ClientCertificateSigningRequestInfo{
-					CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+					CSRMeta: certchains.CSRMeta{
 						Name:         "kubelet-client",
 						ValidityDays: cryptomaterial.ClientCertValidityDays,
 					},
@@ -158,7 +158,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 				},
 			).WithServingCertificates(
 				&certchains.ServingCertificateSigningRequestInfo{
-					CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+					CSRMeta: certchains.CSRMeta{
 						Name:         "kubelet-server",
 						ValidityDays: cryptomaterial.ServingCertValidityDays,
 					},
@@ -172,7 +172,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			cryptomaterial.AggregatorFrontProxySignerCAValidityDays,
 		).WithClientCertificates(
 			&certchains.ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "aggregator-client",
 					ValidityDays: cryptomaterial.ClientCertValidityDays,
 				},
@@ -189,7 +189,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			cryptomaterial.ServiceCAValidityDays,
 		).WithServingCertificates(
 			&certchains.ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "route-controller-manager-serving",
 					ValidityDays: cryptomaterial.ServiceCAServingCertValidityDays,
 				},
@@ -206,7 +206,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			2*365,
 		).WithServingCertificates(
 			&certchains.ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "router-default-serving",
 					ValidityDays: 2 * 365,
 				},
@@ -224,7 +224,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			3650,
 		).WithServingCertificates(
 			&certchains.ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "kube-external-serving",
 					ValidityDays: 365,
 				},
@@ -240,7 +240,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			3650,
 		).WithServingCertificates(
 			&certchains.ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "kube-apiserver-localhost-serving",
 					ValidityDays: 365,
 				},
@@ -257,7 +257,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			3650,
 		).WithServingCertificates(
 			&certchains.ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "kube-apiserver-service-network-serving",
 					ValidityDays: 365,
 				},
@@ -284,7 +284,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			cryptomaterial.EtcdSignerCAValidityDays,
 		).WithClientCertificates(
 			&certchains.ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "apiserver-etcd-client",
 					ValidityDays: 10 * 365,
 				},
@@ -292,7 +292,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 			},
 		).WithPeerCertificiates(
 			&certchains.PeerCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "etcd-peer",
 					ValidityDays: 3 * 365,
 				},
@@ -300,7 +300,7 @@ func certSetup(cfg *config.MicroshiftConfig) (*certchains.CertificateChains, err
 				Hostnames: []string{"localhost", cfg.NodeIP, "127.0.0.1", cfg.NodeName},
 			},
 			&certchains.PeerCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: certchains.CertificateSigningRequestInfo{
+				CSRMeta: certchains.CSRMeta{
 					Name:         "etcd-serving",
 					ValidityDays: 3 * 365,
 				},

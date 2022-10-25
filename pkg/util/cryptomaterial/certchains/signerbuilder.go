@@ -17,6 +17,7 @@ type SignerInfo interface {
 type CertificateSignerBuilder interface {
 	SignerInfo
 
+	WithSignerConfig(config *crypto.CA) CertificateSignerBuilder
 	WithSubCAs(subCAsInfo ...CertificateSignerBuilder) CertificateSignerBuilder
 	WithClientCertificates(signInfos ...*ClientCertificateSigningRequestInfo) CertificateSignerBuilder
 	WithServingCertificates(signInfos ...*ServingCertificateSigningRequestInfo) CertificateSignerBuilder
@@ -31,11 +32,9 @@ type certificateSigner struct {
 
 	// signerConfig should only be used in case this is a sub-ca signer
 	// It should be populated during CertificateSigner.SignSubCA()
-	signerConfig             *crypto.CA
-	subCAs                   []CertificateSignerBuilder
-	clientCertificatesToSign []*ClientCertificateSigningRequestInfo
-	serverCertificatesToSign []*ServingCertificateSigningRequestInfo
-	peerCertificatesToSign   []*PeerCertificateSigningRequestInfo
+	signerConfig       *crypto.CA
+	subCAs             []CertificateSignerBuilder
+	certificatesToSign []CSRInfo
 }
 
 // NewCertificateSigner returns a builder object for a certificate chain for the given signer
@@ -51,18 +50,32 @@ func (s *certificateSigner) Name() string      { return s.signerName }
 func (s *certificateSigner) Directory() string { return s.signerDir }
 func (s *certificateSigner) ValidityDays() int { return s.signerValidityDays }
 
+// WithSignerConfig uses the provided configuration in `config` to sign its
+// direct certificates.
+// This is useful when creating intermediate signers.
+func (s *certificateSigner) WithSignerConfig(config *crypto.CA) CertificateSignerBuilder {
+	s.signerConfig = config
+	return s
+}
+
 func (s *certificateSigner) WithClientCertificates(signInfos ...*ClientCertificateSigningRequestInfo) CertificateSignerBuilder {
-	s.clientCertificatesToSign = append(s.clientCertificatesToSign, signInfos...)
+	for _, signInfo := range signInfos {
+		s.certificatesToSign = append(s.certificatesToSign, signInfo)
+	}
 	return s
 }
 
 func (s *certificateSigner) WithServingCertificates(signInfos ...*ServingCertificateSigningRequestInfo) CertificateSignerBuilder {
-	s.serverCertificatesToSign = append(s.serverCertificatesToSign, signInfos...)
+	for _, signInfo := range signInfos {
+		s.certificatesToSign = append(s.certificatesToSign, signInfo)
+	}
 	return s
 }
 
 func (s *certificateSigner) WithPeerCertificiates(signInfos ...*PeerCertificateSigningRequestInfo) CertificateSignerBuilder {
-	s.peerCertificatesToSign = append(s.peerCertificatesToSign, signInfos...)
+	for _, signInfo := range signInfos {
+		s.certificatesToSign = append(s.certificatesToSign, signInfo)
+	}
 	return s
 }
 
@@ -106,23 +119,9 @@ func (s *certificateSigner) Complete() (*CertificateSigner, error) {
 		}
 	}
 
-	for _, si := range s.clientCertificatesToSign {
+	for _, si := range s.certificatesToSign {
 		si := si
-		if err := signerCompleted.SignClientCertificate(si); err != nil {
-			return nil, err
-		}
-	}
-
-	for _, si := range s.serverCertificatesToSign {
-		si := si
-		if err := signerCompleted.SignServingCertificate(si); err != nil {
-			return nil, err
-		}
-	}
-
-	for _, si := range s.peerCertificatesToSign {
-		si := si
-		if err := signerCompleted.SignPeerCertificate(si); err != nil {
+		if err := signerCompleted.SignCertificate(si); err != nil {
 			return nil, err
 		}
 	}

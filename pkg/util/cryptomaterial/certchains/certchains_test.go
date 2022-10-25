@@ -18,21 +18,21 @@ func TestCertificateChains_WalkChains(t *testing.T) {
 	testChains, err := NewCertificateChains(
 		NewCertificateSigner("test-signer1", filepath.Join(tmpDir, "test-signer1"), 1).
 			WithClientCertificates(&ClientCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+				CSRMeta: CSRMeta{
 					Name:         "test-client1",
 					ValidityDays: 1,
 				},
 				UserInfo: &user.DefaultInfo{Name: "test-user", Groups: []string{"test-group1", "test-group2"}},
 			},
 				&ClientCertificateSigningRequestInfo{
-					CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+					CSRMeta: CSRMeta{
 						Name:         "test-client2",
 						ValidityDays: 1,
 					},
 					UserInfo: &user.DefaultInfo{Name: "test-user2"},
 				},
 			).WithServingCertificates(&ServingCertificateSigningRequestInfo{
-			CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+			CSRMeta: CSRMeta{
 				Name:         "test-signer1-server1",
 				ValidityDays: 1,
 			},
@@ -40,7 +40,7 @@ func TestCertificateChains_WalkChains(t *testing.T) {
 		}),
 		NewCertificateSigner("test-signer2", filepath.Join(tmpDir, "test-signer2"), 1).
 			WithServingCertificates(&ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+				CSRMeta: CSRMeta{
 					Name:         "test-server1",
 					ValidityDays: 1,
 				},
@@ -48,7 +48,7 @@ func TestCertificateChains_WalkChains(t *testing.T) {
 			}),
 		NewCertificateSigner("test-signer3", filepath.Join(tmpDir, "test-signer3"), 1).
 			WithServingCertificates(&ServingCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+				CSRMeta: CSRMeta{
 					Name:         "test-signer3-server1",
 					ValidityDays: 1,
 				},
@@ -56,7 +56,7 @@ func TestCertificateChains_WalkChains(t *testing.T) {
 			}).
 			WithSubCAs(NewCertificateSigner("test-signer3-subca1", filepath.Join(tmpDir, "test-signer3-subca1"), 1).
 				WithClientCertificates(&ClientCertificateSigningRequestInfo{
-					CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+					CSRMeta: CSRMeta{
 						Name:         "test-client1",
 						ValidityDays: 1,
 					},
@@ -64,7 +64,7 @@ func TestCertificateChains_WalkChains(t *testing.T) {
 				}),
 			).
 			WithPeerCertificiates(&PeerCertificateSigningRequestInfo{
-				CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+				CSRMeta: CSRMeta{
 					Name:         "test-peer1",
 					ValidityDays: 1,
 				},

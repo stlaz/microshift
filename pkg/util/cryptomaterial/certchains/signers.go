@@ -17,6 +17,42 @@ import (
 	"github.com/openshift/microshift/pkg/util/cryptomaterial"
 )
 
+type CSRInfo interface{ GetMeta() CSRMeta }
+
+type CSRMeta struct {
+	Name         string
+	ValidityDays int
+}
+
+type CertificateRequestInfo interface {
+	GetMeta() CSRMeta
+}
+
+type ClientCertificateSigningRequestInfo struct {
+	CSRMeta
+
+	UserInfo user.Info
+}
+
+func (i *ClientCertificateSigningRequestInfo) GetMeta() CSRMeta { return i.CSRMeta }
+
+type ServingCertificateSigningRequestInfo struct {
+	CSRMeta
+
+	Hostnames []string
+}
+
+func (i *ServingCertificateSigningRequestInfo) GetMeta() CSRMeta { return i.CSRMeta }
+
+type PeerCertificateSigningRequestInfo struct {
+	CSRMeta
+
+	UserInfo  user.Info
+	Hostnames []string
+}
+
+func (i *PeerCertificateSigningRequestInfo) GetMeta() CSRMeta { return i.CSRMeta }
+
 type CertificateSigner struct {
 	signerName         string
 	signerConfig       *crypto.CA
@@ -28,37 +64,144 @@ type CertificateSigner struct {
 }
 
 type signedCertificateInfo struct {
-	certDir   string
+	CSRInfo
 	tlsConfig *crypto.TLSCertificateConfig
-}
-
-type ClientCertificateSigningRequestInfo struct {
-	CertificateSigningRequestInfo
-
-	UserInfo user.Info
-}
-
-type ServingCertificateSigningRequestInfo struct {
-	CertificateSigningRequestInfo
-
-	Hostnames []string
-}
-
-type PeerCertificateSigningRequestInfo struct {
-	CertificateSigningRequestInfo
-
-	UserInfo  user.Info
-	Hostnames []string
-}
-
-type CertificateSigningRequestInfo struct {
-	Name         string
-	ValidityDays int
 }
 
 func (s *CertificateSigner) GetSignerCertPEM() ([]byte, error) {
 	certPem, _, err := s.signerConfig.Config.GetPEMBytes()
 	return certPem, err
+}
+
+func (s *CertificateSigner) Regenerate(certPath ...string) error {
+	switch len(certPath) {
+	case 0: // renew ourselves and all our sub-certs
+		if len(s.signerConfig.Config.Certs) == 1 {
+			// this is a root CA, not an intermediary, regen the TLS config
+			if err := s.regenerateSelf(); err != nil {
+				return fmt.Errorf("failed to regenerate CA %q: %v", s.signerName, err)
+			}
+		}
+
+		for _, subCAName := range s.GetSubCANames() {
+			if err := s.regenerateSubCA(subCAName); err != nil {
+				return fmt.Errorf("failed to regenerate subCA %q: %v", subCAName, err)
+			}
+		}
+
+		for _, certName := range s.GetCertNames() {
+			if err := s.regenerateCertificate(certName); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case 1: // renew a direct sub-cert
+		if err := s.regenerateSubCA(certPath[0]); err != nil && !IsSignerNotFoundError(err) {
+			return err
+		}
+		return s.regenerateCertificate(certPath[0])
+
+	default: // forward the request to another sub-signer
+		if subCA := s.GetSubCA(certPath[0]); subCA != nil {
+			return subCA.Regenerate(certPath[1:]...)
+		}
+		return fmt.Errorf("%q is not an intermediary signer", certPath[0])
+	}
+}
+
+func (s *CertificateSigner) regenerateSelf() error {
+	if err := os.RemoveAll(s.signerDir); err != nil {
+		return fmt.Errorf("failed to regenerate CA %q: %v", s.signerName, err)
+	}
+
+	signerConfig, _, err := crypto.EnsureCA(
+		cryptomaterial.CACertPath(s.signerDir),
+		cryptomaterial.CAKeyPath(s.signerDir),
+		cryptomaterial.CASerialsPath(s.signerDir),
+		s.signerName,
+		s.signerValidityDays,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to regenerate %s CA certificate: %w", s.signerName, err)
+	}
+
+	// TODO: rewrite itself in the bundles, too
+	s.signerConfig = signerConfig
+
+	return nil
+}
+
+func (s *CertificateSigner) regenerateSubCA(subCAName string) error {
+	subCA := s.GetSubCA(subCAName)
+	if subCA == nil {
+		return NewSignerNotFound(subCAName)
+	}
+
+	if err := os.RemoveAll(subCA.signerDir); err != nil {
+		return fmt.Errorf("failed to remove subCA dir %q: %v", subCA.signerDir, err)
+	}
+
+	if err := s.SignSubCA(subCA.toBuilder()); err != nil {
+		return fmt.Errorf("failed to regenerate subCA %q certificate: %v", subCA.signerName, err)
+	}
+
+	return nil
+}
+
+func (s *CertificateSigner) regenerateCertificate(certName string) error {
+	certInfo := s.signedCertificates[certName]
+	if certInfo == nil {
+		return fmt.Errorf("no certificate with name %q was found", certName)
+	}
+
+	certDir := filepath.Join(s.signerDir, certInfo.GetMeta().Name)
+	if err := os.RemoveAll(certDir); err != nil {
+		return fmt.Errorf("failed to remove cert dir %q: %v", certDir, err)
+	}
+
+	if err := s.SignCertificate(certInfo.CSRInfo); err != nil {
+		return fmt.Errorf("failed to regenerate cert %q: %v", certInfo.GetMeta().Name, err)
+	}
+
+	return nil
+}
+
+func (s *CertificateSigner) toBuilder() CertificateSignerBuilder {
+	signer := NewCertificateSigner(s.signerName, s.signerDir, s.signerValidityDays)
+
+	for _, subCA := range s.subCAs {
+		signer = signer.WithSubCAs(subCA.toBuilder())
+	}
+
+	for _, cert := range s.signedCertificates {
+		switch csrInfo := cert.CSRInfo.(type) {
+		case *ClientCertificateSigningRequestInfo:
+			signer = signer.WithClientCertificates(csrInfo)
+		case *ServingCertificateSigningRequestInfo:
+			signer = signer.WithServingCertificates(csrInfo)
+		case *PeerCertificateSigningRequestInfo:
+			signer = signer.WithPeerCertificiates(csrInfo)
+		default:
+			panic("failed to handle type %T as a CSRInfo")
+		}
+	}
+
+	return signer
+}
+
+func (s *CertificateSigner) SignCertificate(csrInfo CSRInfo) error {
+	switch csrInfo := csrInfo.(type) {
+	case *ClientCertificateSigningRequestInfo:
+		return s.SignClientCertificate(csrInfo)
+	case *ServingCertificateSigningRequestInfo:
+		return s.SignServingCertificate(csrInfo)
+	case *PeerCertificateSigningRequestInfo:
+		return s.SignPeerCertificate(csrInfo)
+	default:
+		return fmt.Errorf("unknown CSR info type: %T", csrInfo)
+	}
 }
 
 func (s *CertificateSigner) SignSubCA(subSignerInfo CertificateSignerBuilder) error {
@@ -91,16 +234,7 @@ func (s *CertificateSigner) SignSubCA(subSignerInfo CertificateSignerBuilder) er
 		}
 	}
 
-	// create the internal representation of a signer to inject the subCA CA config
-	subSignerInfoInternal := &certificateSigner{
-		signerName:         subSignerName,
-		signerDir:          subSignerDir,
-		signerValidityDays: subSignerInfo.ValidityDays(),
-
-		signerConfig: subCA,
-	}
-
-	subCertSigner, err := subSignerInfoInternal.Complete()
+	subCertSigner, err := subSignerInfo.WithSignerConfig(subCA).Complete()
 	if err != nil {
 		return err
 	}
@@ -124,7 +258,7 @@ func (s *CertificateSigner) SignClientCertificate(signInfo *ClientCertificateSig
 	}
 
 	s.signedCertificates[signInfo.Name] = &signedCertificateInfo{
-		certDir:   certDir,
+		CSRInfo:   signInfo,
 		tlsConfig: tlsConfig,
 	}
 	return nil
@@ -145,7 +279,7 @@ func (s *CertificateSigner) SignServingCertificate(signInfo *ServingCertificateS
 	}
 
 	s.signedCertificates[signInfo.Name] = &signedCertificateInfo{
-		certDir:   certDir,
+		CSRInfo:   signInfo,
 		tlsConfig: tlsConfig,
 	}
 	return nil
@@ -185,7 +319,7 @@ func (s *CertificateSigner) SignPeerCertificate(signInfo *PeerCertificateSigning
 	}
 
 	s.signedCertificates[signInfo.Name] = &signedCertificateInfo{
-		certDir:   certDir,
+		CSRInfo:   signInfo,
 		tlsConfig: tlsConfig,
 	}
 

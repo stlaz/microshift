@@ -23,14 +23,14 @@ func Test_certificateSigner_Complete(t *testing.T) {
 			testSigner: NewCertificateSigner("test-signer-signer", filepath.Join(tmpDir, "generalTest"), 1).
 				WithClientCertificates(
 					&ClientCertificateSigningRequestInfo{
-						CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+						CSRMeta: CSRMeta{
 							Name:         "test-client",
 							ValidityDays: 1,
 						},
 						UserInfo: &user.DefaultInfo{Name: "test-user", Groups: []string{"test-group1", "test-group2"}},
 					},
 					&ClientCertificateSigningRequestInfo{
-						CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+						CSRMeta: CSRMeta{
 							Name:         "test-client2",
 							ValidityDays: 1,
 						},
@@ -38,7 +38,7 @@ func Test_certificateSigner_Complete(t *testing.T) {
 					},
 				).WithServingCertificates(
 				&ServingCertificateSigningRequestInfo{
-					CertificateSigningRequestInfo: CertificateSigningRequestInfo{
+					CSRMeta: CSRMeta{
 						Name:         "test-server",
 						ValidityDays: 1,
 					},
